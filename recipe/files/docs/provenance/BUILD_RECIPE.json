@@ -1,0 +1,30 @@
+{
+  "schema": "kitforge.build_recipe.v1",
+  "slug": "coredns",
+  "image": "readystack/coredns:v1.14.2-CE-ubuntu24.04-r4",
+  "build_method": "source-rebuild-go",
+  "source": {
+    "repo": "https://github.com/coredns/coredns",
+    "ref": "v1.14.2",
+    "commit": "dd1df4f5db93767a44e37638df44969503b320d2",
+    "source_date_epoch": 1795404131,
+    "source_date_epoch_provenance": "the time release v1.14.2-CE-ubuntu24.04-r4 was cut (2026-11-23T03:22:11Z), by scripts/rerelease-agenda.py: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit dd1df4f5db93, dated 2026-03-06T04:49:45Z (source.commit_epoch).",
+    "builder_image": "golang:1.26.11-bookworm",
+    "go_version_required": "1.25.0",
+    "vendor_committed": false,
+    "_version_note": "v1.14.2 is the CoreDNS version kubeadm v1.36.6 names (cmd/kubeadm/app/constants CoreDNSVersion), used with kubeadm's own image tag (no dns.imageTag override). It replaced v1.14.7 on 2026-10-29 (main session, integration review E): kubeadm v1.36.6 vendors corefile-migration v1.0.31, which knows CoreDNS only up to 1.14.2, so `kubeadm upgrade` preflight (checkMigration -> migration.Migrate(current, 1.14.2)) fails on a newer installed CoreDNS. go.mod `go 1.25.0`, built with GOTOOLCHAIN=local on golang 1.26.10.",
+    "source_date_epoch_basis": "release-cut",
+    "commit_epoch": 1772772585
+  },
+  "binaries_from_source": [
+    {
+      "name": "coredns",
+      "main_pkg": ".",
+      "ldflags": "-s -w -X github.com/coredns/coredns/coremain.GitCommit=@COMMIT:7@",
+      "out_path": "/coredns",
+      "verify_subcmd": "-version",
+      "verify_contains": "CoreDNS-1.14.2"
+    }
+  ],
+  "runtime_packages": []
+}

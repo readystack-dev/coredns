@@ -1,0 +1,9 @@
+{
+  "schema": "kitforge.source_tree_hash.v1",
+  "slug": "coredns",
+  "repo": "https://github.com/coredns/coredns",
+  "ref": "v1.14.2",
+  "commit": "dd1df4f5db93767a44e37638df44969503b320d2",
+  "tree_listing_sha256": "f69cbed3da6f6a1dbbddc86418a6aae8588c6ecf4c604208b9eba41225f42670",
+  "file_count": 917
+}

@@ -1,0 +1,62 @@
+# =====================================================================
+# CoreDNS v1.14.2 VENDOR STAGE (online). Does ALL the network work and exports a build-ready tree, so
+# Dockerfile.offline.pinned builds the image with --network=none:
+#   - coredns-src : CoreDNS v1.14.2 (commit pinned by registry/stacks/kubevirt-stack.json), fully vendored Go tree
+#   - chisel      : the chiselled Ubuntu 24.04 runtime (base-files, base-passwd, ca-certificates, tzdata, dash and the
+#                   coreutils shell set), cut by Canonical's chisel exactly as generators/gen_dockerfile.py's
+#                   runtime_base does for the fleet's slim images: rootfs.tar, the .debs it was cut from, packages.tsv
+#   - debs        : libcap2-bin from the same pinned ubuntu:24.04 (setcap), used only by the offline build stage that
+#                   gives /coredns cap_net_bind_service=+ep as upstream's Dockerfile does; it is not in the image
+# CVE floors (mirror strategies/coredns.json dep_bumps) are raise-only, to an exact version, never @latest.
+# Export (assemble_kit): docker build -f Dockerfile.vendor --target export, then docker cp the image's / into ./vendored
+# =====================================================================
+
+# --- 1) CoreDNS v1.14.2 -------------------------------------------------------------------------------------------------
+FROM golang:1.26.11-bookworm@sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0 AS corednsvendor
+ENV GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=mod
+WORKDIR /coredns
+RUN git clone --depth 1 --branch v1.14.2 -q https://github.com/coredns/coredns.git . && \
+    test "$(git rev-parse HEAD)" = dd1df4f5db93767a44e37638df44969503b320d2
+# floor() fails closed (L-A133): `go list -mod=mod`, and only "not a known dependency" skips a module; any other
+# error (a missing go.sum entry after an earlier raise, the proxy unreachable) stops the step instead of skipping
+# every later floor, as caddy chain 741 did.
+RUN floor() { e=$(mktemp); cur=$(go list -mod=mod -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' "$1" 2>"$e") || \
+        { grep -q 'not a known dependency' "$e" && return 0; cat "$e" >&2; return 1; }; \
+      [ -n "$cur" ] || return 0; [ "$(printf '%s\n%s\n' "$cur" "$2" | sort -V | tail -1)" = "$cur" ] && return 0; \
+      echo "floor $1: $cur -> $2"; \
+      rp=$(go list -mod=mod -m -f '{{if .Replace}}r{{end}}' "$1") || return 1; if [ -n "$rp" ]; then go mod edit -replace="$1=$1@$2"; \
+      else go mod edit -require="$1@$2"; fi; } && \
+    floor golang.org/x/net v0.62.0 && floor golang.org/x/crypto v0.56.0 && floor golang.org/x/text v0.41.0 && \
+    floor google.golang.org/grpc v1.83.2 && floor github.com/klauspost/compress v1.20.2 && \
+    floor github.com/go-jose/go-jose/v4 v4.1.6 && floor github.com/DataDog/dd-trace-go/v2 v2.8.2 && \
+    floor go.etcd.io/etcd/api/v3 v3.6.16 && floor go.etcd.io/etcd/client/pkg/v3 v3.6.16 && floor go.etcd.io/etcd/client/v3 v3.6.16 && \
+    go mod tidy && go mod vendor && rm -rf .git
+
+# --- 2) the chiselled runtime: gen_dockerfile.py's runtime_base cut (CHISEL_BASE_SLICES + CHISEL_SHELL_SLICES) --------
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289 AS chiselcut
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl file && \
+    mkdir -p /debs && cd /debs && apt-get download libcap2-bin && ls -1 /debs && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/chisel.tgz https://github.com/canonical/chisel/releases/download/v1.5.1/chisel_v1.5.1_linux_amd64.tar.gz && \
+    echo "89612f46de83e850aae11fca26a32a22cc2964891f2cc538211b906787d2b83e4496fa203a5074e06a9932f1fbe84a73  /tmp/chisel.tgz" | sha384sum -c - && tar -xzf /tmp/chisel.tgz -C /usr/local/bin chisel && \
+    curl -fsSL -o /tmp/releases.tgz https://github.com/canonical/chisel-releases/archive/f2600d3aa90123db6d44bb1441a99afc8b5847d9.tar.gz && \
+    echo "e5b4484bb283149ed7fc0f42ad2194fed28cae0bf1036704853d60ec31298bef  /tmp/releases.tgz" | sha256sum -c - && \
+    mkdir -p /opt/chisel-releases && tar -xzf /tmp/releases.tgz -C /opt/chisel-releases --strip-components=1
+RUN mkdir -p /rootfs /cache && XDG_CACHE_HOME=/cache chisel cut --release /opt/chisel-releases --root /rootfs base-files_base base-files_release-info base-files_chisel base-passwd_data ca-certificates_data tzdata_zoneinfo dash_bins coreutils_output-of-entire-files coreutils_env coreutils_echo coreutils_test coreutils_tr-utility coreutils_sort coreutils_head coreutils_tail coreutils_cut coreutils_printf coreutils_working-context coreutils_system-context coreutils_basename coreutils_dirname coreutils_rm-utility coreutils_ln-utility coreutils_readlink coreutils_date coreutils_timeout coreutils_delaying
+RUN set -eu; mkdir -p /chisel/debs /rootfs/var/lib/dpkg; : > /tmp/status; : > /chisel/packages.tsv; \
+    for f in /cache/chisel/sha256/* /cache/chisel/sha512/*; do [ -f "$f" ] && file "$f" | grep -q "Debian binary package" || continue; \
+      p=$(dpkg-deb -f "$f" Package); v=$(dpkg-deb -f "$f" Version); \
+      cp "$f" "/chisel/debs/${p}_${v}.deb"; printf '%s\t%s\t%s\n' "$p" "$v" "$(sha256sum < "$f" | cut -c1-64)" >> /chisel/packages.tsv; done; \
+    [ -s /chisel/packages.tsv ] || { echo "no .deb found in the chisel cache" >&2; exit 1; }; \
+    LC_ALL=C sort -o /chisel/packages.tsv /chisel/packages.tsv; \
+    cut -f1,2 /chisel/packages.tsv | while IFS="$(printf '\t')" read -r p v; do \
+      dpkg-deb -f "/chisel/debs/${p}_${v}.deb" | sed '/^Package:/a Status: install ok installed' >> /tmp/status; echo >> /tmp/status; done; \
+    install -m 0644 /tmp/status /rootfs/var/lib/dpkg/status; \
+    { echo "chisel v1.5.1"; echo "chisel-releases f2600d3aa90123db6d44bb1441a99afc8b5847d9"; for s in base-files_base base-files_release-info base-files_chisel base-passwd_data ca-certificates_data tzdata_zoneinfo dash_bins coreutils_output-of-entire-files coreutils_env coreutils_echo coreutils_test coreutils_tr-utility coreutils_sort coreutils_head coreutils_tail coreutils_cut coreutils_printf coreutils_working-context coreutils_system-context coreutils_basename coreutils_dirname coreutils_rm-utility coreutils_ln-utility coreutils_readlink coreutils_date coreutils_timeout coreutils_delaying; do echo "$s"; done; } > /chisel/slices.txt; \
+    tar --sort=name --numeric-owner --format=posix --pax-option=delete=atime,delete=ctime -cf /chisel/rootfs.tar -C /rootfs . && \
+    echo "chiselled rootfs: $(wc -l < /chisel/packages.tsv) packages, $(du -sh /rootfs | cut -f1)"
+
+FROM scratch AS export
+COPY --from=corednsvendor /coredns /coredns-src
+COPY --from=chiselcut /chisel /chisel
+COPY --from=chiselcut /debs /debs

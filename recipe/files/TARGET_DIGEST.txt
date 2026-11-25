@@ -1,0 +1,6 @@
+image_manifest_digest=sha256:048cd4a243b437f57cf63dceaaace4d4a456b32f8c8188952f298e8055e2b9eb
+config_digest=sha256:961589254857729ff6c3e18eb84f0e55135781510bfc9ca316593651395c7c6f
+tag=readystack/coredns:v1.14.2-CE-ubuntu24.04-r4
+probe_port=8080
+probe_path=/health
+probe_timeout=180

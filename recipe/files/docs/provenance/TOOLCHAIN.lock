@@ -1,0 +1,102 @@
+{
+  "apt_refresh": [],
+  "binaries_from_source": [
+    {
+      "ldflags": "-s -w -X github.com/coredns/coredns/coremain.GitCommit=@COMMIT:7@",
+      "main_pkg": ".",
+      "name": "coredns",
+      "out_path": "/coredns",
+      "verify_contains": "CoreDNS-1.14.2",
+      "verify_subcmd": "-version"
+    }
+  ],
+  "build_method": "source-rebuild-go",
+  "chain_id": 1197,
+  "dep_bumps": [
+    {
+      "module": "golang.org/x/net",
+      "to": "v0.60.0",
+      "why": "Fleet floor: x/net below 0.60.0 carries 1 critical + 4 high fixable (CVE-2026-78663 critical, CVE-2026-78659/78660/78669/97032; strategies/kubernetes.json). CoreDNS v1.14.2 pins 0.51.0."
+    },
+    {
+      "module": "golang.org/x/crypto",
+      "to": "v0.56.0",
+      "why": "Fleet floor (high fixable CVE-2026-56854/56855/78662, fixed in 0.55.0/0.56.0). CoreDNS v1.14.2 pins 0.48.0."
+    },
+    {
+      "module": "golang.org/x/text",
+      "to": "v0.41.0",
+      "why": "Fleet floor (high fixable CVE-2026-56851, fixed in 0.41.0). CoreDNS v1.14.2 resolves 0.34.0."
+    },
+    {
+      "module": "google.golang.org/grpc",
+      "to": "v1.83.2",
+      "why": "Fleet floor: high fixable CVE-2026-84304/84445 (fixed 1.82.2/1.83.1), GHSA-2v4p-qf9q-27wj open on 1.83.1. CoreDNS v1.14.2 pins 1.79.1."
+    },
+    {
+      "module": "github.com/klauspost/compress",
+      "to": "v1.18.7",
+      "why": "Fleet floor (CVE-2026-63209, GHSA-259r-337f-4rfw); CoreDNS v1.14.2 resolves 1.18.0."
+    },
+    {
+      "module": "github.com/go-jose/go-jose/v4",
+      "to": "v4.1.6",
+      "why": "Fleet floor in every tree of product-kits/kubernetes/build/ (go-jose v4 below 4.1.6); CoreDNS v1.14.2 resolves 4.1.4."
+    },
+    {
+      "module": "github.com/DataDog/dd-trace-go/v2",
+      "to": "v2.8.2",
+      "why": "High fixable CVE-2026-50274 (uncontrolled resource consumption, fixed in 2.8.1; Docker Scout 2026-10-29 on the v1.14.2 kit's first build, the only fixable C/H). CoreDNS v1.14.2 pins 2.6.0; v2.8.2 is the version CoreDNS v1.14.7 itself builds against."
+    },
+    {
+      "module": "go.etcd.io/etcd/client/pkg/v3",
+      "to": "v3.6.16",
+      "why": "CoreDNS v1.14.2 (kubernetes plugin, etcd plugin) resolves the etcd client modules at 3.6.8: high fixable CVE-2026-73500 in client/pkg (fixed in 3.6.14); moved to the etcd release the stack runs (v3.6.16), with api/v3 and client/v3."
+    },
+    {
+      "module": "go.etcd.io/etcd/api/v3",
+      "to": "v3.6.16",
+      "why": "moves with go.etcd.io/etcd/client/pkg/v3 (one etcd release, one version)."
+    },
+    {
+      "module": "go.etcd.io/etcd/client/v3",
+      "to": "v3.6.16",
+      "why": "moves with go.etcd.io/etcd/client/pkg/v3 (one etcd release, one version)."
+    }
+  ],
+  "expected_residuals": [],
+  "images": [
+    {
+      "digest": "sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0",
+      "ref": "golang:1.26.11-bookworm",
+      "role": "builder"
+    },
+    {
+      "digest": "sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0",
+      "ref": "golang:1.26.11-bookworm",
+      "role": "offline_builder"
+    },
+    {
+      "digest": "sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289",
+      "ref": "ubuntu:24.04",
+      "role": "base"
+    }
+  ],
+  "mod_replaces": [],
+  "runtime_packages": [],
+  "schema": "kitforge.toolchain_lock.v1",
+  "slug": "coredns",
+  "source": {
+    "builder_image": "golang:1.26.11-bookworm",
+    "commit": "dd1df4f5db93767a44e37638df44969503b320d2",
+    "commit_epoch": 1772772585,
+    "go_version_required": "1.25.0",
+    "ref": "v1.14.2",
+    "repo": "https://github.com/coredns/coredns",
+    "source_date_epoch": 1795404131,
+    "source_date_epoch_basis": "release-cut",
+    "source_date_epoch_provenance": "the time release v1.14.2-CE-ubuntu24.04-r4 was cut (2026-11-23T03:22:11Z), by scripts/rerelease-agenda.py: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit dd1df4f5db93, dated 2026-03-06T04:49:45Z (source.commit_epoch).",
+    "vendor_committed": false
+  },
+  "version": "v1.14.2"
+}
